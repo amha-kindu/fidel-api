@@ -1,10 +1,9 @@
 import asyncio
 import os
-import uuid
 
 import pytest
-from fastapi import FastAPI
 from httpx import AsyncClient
+from collections.abc import AsyncGenerator
 from sqlalchemy.ext.asyncio import AsyncEngine, AsyncSession, async_sessionmaker, create_async_engine
 
 from app.api.deps import get_db_session
@@ -26,7 +25,7 @@ def db_url() -> str:
 
 
 @pytest.fixture(scope="session")
-async def engine(db_url: str) -> AsyncEngine:
+async def engine(db_url: str) -> AsyncGenerator[AsyncEngine, None]:
     engine = create_async_engine(db_url, future=True)
     async with engine.begin() as conn:
         await conn.run_sync(Base.metadata.create_all)
@@ -37,7 +36,7 @@ async def engine(db_url: str) -> AsyncEngine:
 
 
 @pytest.fixture
-async def db_session(engine: AsyncEngine) -> AsyncSession:
+async def db_session(engine: AsyncEngine) -> AsyncGenerator[AsyncSession, None]:
     SessionLocal = async_sessionmaker(engine, expire_on_commit=False, class_=AsyncSession)
     async with SessionLocal() as session:
         yield session
@@ -45,7 +44,7 @@ async def db_session(engine: AsyncEngine) -> AsyncSession:
 
 
 @pytest.fixture
-async def client(db_session: AsyncSession) -> AsyncClient:
+async def client(db_session: AsyncSession) -> AsyncGenerator[AsyncClient, None]:
     async def override_get_db():
         yield db_session
 

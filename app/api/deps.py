@@ -3,7 +3,7 @@ from uuid import UUID
 from fastapi import Depends, HTTPException, status
 from fastapi.security import OAuth2PasswordBearer
 from sqlalchemy.ext.asyncio import AsyncSession
-from collections.abc import AsyncIterator
+from collections.abc import AsyncGenerator
 
 from app.core import security
 from app.core.config import settings
@@ -15,7 +15,7 @@ from app.schemas.auth import TokenPayload
 oauth2_scheme = OAuth2PasswordBearer(tokenUrl=f"{settings.api_v1_prefix}/auth/login")
 
 
-async def get_db_session() -> AsyncIterator[AsyncSession]:
+async def get_db_session() -> AsyncGenerator[AsyncSession, None]:
     async for session in get_db():
         yield session
 
