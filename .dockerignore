@@ -1,0 +1,56 @@
+# VCS
+.git
+.gitignore
+
+# Python caches
+__pycache__
+*.pyc
+*.pyo
+*.pyd
+*.so
+*.egg-info
+.eggs
+.pytest_cache
+.mypy_cache
+.ruff_cache
+.cache
+
+# Virtual environments
+.venv
+venv
+ENV
+env
+
+# Local env / secrets
+.env
+.env.*
+!.env.example
+
+# Build artifacts
+build
+dist
+
+# Logs
+*.log
+logs
+
+# Tests (optional: include if you run tests in image build)
+tests
+reports
+coverage.xml
+htmlcov
+.coverage
+
+# Editor/OS
+.vscode
+.idea
+.DS_Store
+Thumbs.db
+
+# Local data
+data
+tmp
+
+# Docker compose files not needed in image context
+docker-compose.yml
+docker-compose.*.yml

@@ -1,0 +1,74 @@
+# --- OS / Editor ---
+.DS_Store
+Thumbs.db
+.idea/
+.vscode/
+*.swp
+*.swo
+
+# --- Python ---
+__pycache__/
+*.py[cod]
+*.pyo
+*.pyd
+*.so
+*.egg-info/
+.eggs/
+build/
+dist/
+.coverage
+coverage.xml
+htmlcov/
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+.cache/
+
+# --- Virtualenv ---
+.venv/
+venv/
+ENV/
+env/
+
+# --- Poetry ---
+poetry.lock.backup
+poetry.toml
+
+# (Choose ONE approach for poetry.lock)
+# If you ship apps/services, you usually COMMIT poetry.lock -> don't ignore it
+# poetry.lock
+
+# --- Env / Secrets ---
+.env
+.env.*
+!.env.example
+*.pem
+*.key
+*.crt
+
+# --- Logs ---
+*.log
+logs/
+log/
+
+# --- DB / Local state ---
+*.sqlite3
+*.db
+data/
+tmp/
+
+# --- FastAPI / Uvicorn ---
+*.pid
+
+# --- Alembic ---
+# If you keep local alembic.ini overrides, ignore those:
+alembic.ini.local
+**/migrations/*
+
+# --- Docker ---
+docker-compose.override.yml
+
+# --- Tests / Reports ---
+reports/
+junit.xml
+
