@@ -3,11 +3,15 @@ from fastapi.responses import ORJSONResponse
 
 from app.api.v1.router import router as api_router
 from app.core.config import settings
+from app.core.errors import register_exception_handlers
+from app.core.logging import setup_logging
 
+setup_logging()
 app = FastAPI(
     title="Fidel API",
     default_response_class=ORJSONResponse,
 )
+register_exception_handlers(app)
 
 
 @app.get("/health", tags=["health"])
