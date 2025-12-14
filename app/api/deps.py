@@ -11,6 +11,7 @@ from app.db.session import get_db
 from app.models.user import User
 from app.repositories import user_repo
 from app.schemas.auth import TokenPayload
+from app.services.inference_client import InferenceClient, inference_client
 
 oauth2_scheme = OAuth2PasswordBearer(tokenUrl=f"{settings.api_v1_prefix}/auth/login")
 
@@ -40,3 +41,7 @@ async def get_current_user(
     if user is None:
         raise credentials_exception
     return user
+
+
+def get_inference_client() -> InferenceClient:
+    return inference_client
