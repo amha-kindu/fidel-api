@@ -1,6 +1,7 @@
 from typing import AsyncIterator
 from uuid import UUID
 
+import structlog
 from fastapi import APIRouter, Depends, status
 from sse_starlette.sse import EventSourceResponse
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -13,6 +14,8 @@ from app.services.conversation_service import ConversationService
 from app.services.history_service import get_recent_history
 from app.services.inference_client import InferenceClient
 from app.repositories import message_repo
+
+logger = structlog.get_logger(__name__)
 
 router = APIRouter()
 
@@ -67,6 +70,17 @@ async def chat_stream(
                 role=MessageRole.ASSISTANT,
                 content="".join(assistant_parts),
             )
+            logger.info(
+                "chat.assistant.saved",
+                conversation_id=str(conversation_id),
+                user_id=str(current_user.id),
+            )
 
     headers = {"X-Conversation-Id": str(conversation_id)}
+    logger.info(
+        "chat.stream.start",
+        conversation_id=str(conversation_id),
+        user_id=str(current_user.id),
+        has_existing=bool(payload.conversation_id),
+    )
     return EventSourceResponse(event_generator(), headers=headers, status_code=status.HTTP_200_OK)

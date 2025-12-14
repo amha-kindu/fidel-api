@@ -1,11 +1,14 @@
 from uuid import UUID
 
+import structlog
 from fastapi import HTTPException, status
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.models.user import User
 from app.repositories import conversation_repo
 from app.schemas.conversation import ConversationCreate
+
+logger = structlog.get_logger(__name__)
 
 
 class ConversationService:
@@ -15,7 +18,13 @@ class ConversationService:
 
     async def create_conversation(self, payload: ConversationCreate | None = None):
         title = payload.title if payload else None
-        return await conversation_repo.create(self.session, user_id=self.user.id, title=title)
+        conversation = await conversation_repo.create(
+            self.session, user_id=self.user.id, title=title
+        )
+        logger.info(
+            "conversation.created", conversation_id=str(conversation.id), user_id=str(self.user.id)
+        )
+        return conversation
 
     async def list_conversations(self, limit: int = 20, offset: int = 0):
         return await conversation_repo.list_for_user(
@@ -36,3 +45,6 @@ class ConversationService:
         )
         if deleted == 0:
             raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Not found")
+        logger.info(
+            "conversation.deleted", conversation_id=str(conversation_id), user_id=str(self.user.id)
+        )

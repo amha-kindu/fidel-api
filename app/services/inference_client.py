@@ -1,9 +1,12 @@
 from typing import AsyncIterator, Iterable
 
 import httpx
+import structlog
 from tenacity import AsyncRetrying, retry_if_exception_type, stop_after_attempt, wait_exponential
 
 from app.core.config import settings
+
+logger = structlog.get_logger(__name__)
 
 
 class InferenceClient:
@@ -17,6 +20,7 @@ class InferenceClient:
 
     async def stream_chat(self, messages: Iterable[dict]) -> AsyncIterator[str]:
         """Stream chat completion from inference backend."""
+        logger.info("inference.stream.start", base_url=self.base_url)
         async for attempt in AsyncRetrying(
             retry=retry_if_exception_type(httpx.HTTPError),
             wait=wait_exponential(multiplier=0.5, max=2),
@@ -34,6 +38,7 @@ class InferenceClient:
                         if not line:
                             continue
                         yield line
+        logger.info("inference.stream.done", base_url=self.base_url)
 
 
 inference_client = InferenceClient()
