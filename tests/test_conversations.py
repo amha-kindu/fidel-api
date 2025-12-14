@@ -21,6 +21,7 @@ def auth_header(token: str) -> dict[str, str]:
 
 
 @pytest.mark.asyncio(loop_scope="session")
+@pytest.mark.integration
 async def test_conversation_crud_flow(client: AsyncClient):
     email, token = await register_and_login(client)
 
@@ -66,6 +67,7 @@ async def test_conversation_crud_flow(client: AsyncClient):
 
 
 @pytest.mark.asyncio(loop_scope="session")
+@pytest.mark.integration
 async def test_conversations_pagination_and_order(client: AsyncClient):
     _, token = await register_and_login(client)
     titles = ["Conv A", "Conv B", "Conv C"]
@@ -88,6 +90,7 @@ async def test_conversations_pagination_and_order(client: AsyncClient):
 
 
 @pytest.mark.asyncio(loop_scope="session")
+@pytest.mark.integration
 async def test_conversation_requires_auth(client: AsyncClient):
     resp = await client.post("/api/v1/conversations", json={"title": "Nope"})
     assert resp.status_code == HTTPStatus.UNAUTHORIZED
@@ -100,6 +103,7 @@ async def test_conversation_requires_auth(client: AsyncClient):
 
 
 @pytest.mark.asyncio(loop_scope="session")
+@pytest.mark.integration
 async def test_conversation_access_is_user_scoped(client: AsyncClient):
     _, token_user1 = await register_and_login(client)
     _, token_user2 = await register_and_login(client)

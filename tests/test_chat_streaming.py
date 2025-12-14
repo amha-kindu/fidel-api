@@ -25,6 +25,7 @@ def auth_header(token: str) -> dict[str, str]:
 
 
 @pytest.mark.asyncio(loop_scope="session")
+@pytest.mark.integration
 async def test_chat_stream_creates_conversation_and_persists_messages(
     client: AsyncClient, db_session
 ):
@@ -52,6 +53,7 @@ async def test_chat_stream_creates_conversation_and_persists_messages(
 
 
 @pytest.mark.asyncio(loop_scope="session")
+@pytest.mark.integration
 async def test_chat_stream_reuses_conversation(client: AsyncClient, db_session):
     _, token = await register_and_login(client)
     async with client.stream(
@@ -77,12 +79,14 @@ async def test_chat_stream_reuses_conversation(client: AsyncClient, db_session):
 
 
 @pytest.mark.asyncio(loop_scope="session")
+@pytest.mark.integration
 async def test_chat_stream_requires_auth(client: AsyncClient):
     resp = await client.post("/api/v1/chat/stream", json={"message": "Hi"})
     assert resp.status_code == HTTPStatus.UNAUTHORIZED
 
 
 @pytest.mark.asyncio(loop_scope="session")
+@pytest.mark.integration
 async def test_chat_stream_aggregates_chunks(client: AsyncClient, db_session, fake_inference_client: FakeInferenceClient):
     fake_inference_client.chunks = ["data: hello ", "data: world", "[DONE]"]
     _, token = await register_and_login(client)
@@ -103,6 +107,7 @@ async def test_chat_stream_aggregates_chunks(client: AsyncClient, db_session, fa
 
 
 @pytest.mark.asyncio(loop_scope="session")
+@pytest.mark.integration
 async def test_chat_stream_respects_history_limit(client: AsyncClient, db_session, fake_inference_client: FakeInferenceClient):
     fake_inference_client.chunks = ["data: ok", "[DONE]"]
     _, token = await register_and_login(client)
@@ -139,6 +144,7 @@ async def test_chat_stream_respects_history_limit(client: AsyncClient, db_sessio
 
 
 @pytest.mark.asyncio(loop_scope="session")
+@pytest.mark.integration
 async def test_chat_stream_rejects_unknown_conversation(client: AsyncClient):
     _, token = await register_and_login(client)
     bad_id = str(uuid4())

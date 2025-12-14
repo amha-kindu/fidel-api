@@ -14,6 +14,7 @@ async def _login(client: AsyncClient, email: str, password: str):
 
 
 @pytest.mark.asyncio(loop_scope="session")
+@pytest.mark.integration
 async def test_register_login_me_success(client: AsyncClient):
     email = f"user-{uuid.uuid4()}@example.com"
     password = "secret123"
@@ -34,6 +35,7 @@ async def test_register_login_me_success(client: AsyncClient):
 
 
 @pytest.mark.asyncio(loop_scope="session")
+@pytest.mark.integration
 async def test_register_duplicate_email(client: AsyncClient):
     email = f"user-{uuid.uuid4()}@example.com"
     password = "secret123"
@@ -47,6 +49,7 @@ async def test_register_duplicate_email(client: AsyncClient):
 
 
 @pytest.mark.asyncio(loop_scope="session")
+@pytest.mark.integration
 async def test_login_wrong_password(client: AsyncClient):
     email = f"user-{uuid.uuid4()}@example.com"
     password = "secret123"
@@ -58,6 +61,7 @@ async def test_login_wrong_password(client: AsyncClient):
 
 
 @pytest.mark.asyncio(loop_scope="session")
+@pytest.mark.integration
 async def test_login_unknown_user(client: AsyncClient):
     resp = await _login(client, "nobody@example.com", "doesntmatter")
     assert resp.status_code == HTTPStatus.UNAUTHORIZED
@@ -65,6 +69,7 @@ async def test_login_unknown_user(client: AsyncClient):
 
 
 @pytest.mark.asyncio(loop_scope="session")
+@pytest.mark.integration
 async def test_me_requires_auth(client: AsyncClient):
     resp = await client.get("/api/v1/users/me")
     assert resp.status_code == HTTPStatus.UNAUTHORIZED
