@@ -6,6 +6,7 @@ class Settings(BaseSettings):
     env: str = "dev"
     api_v1_prefix: str = "/api/v1"
 
+    test_database_url: str = "postgresql+asyncpg://postgres:postgres@db:5432/test"
     database_url: str = "postgresql+asyncpg://postgres:postgres@db:5432/fidel"
     redis_url: str = "redis://localhost:6379/0"
 

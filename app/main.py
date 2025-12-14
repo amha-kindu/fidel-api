@@ -1,10 +1,11 @@
 from fastapi import FastAPI
 from fastapi.responses import ORJSONResponse
 
-from app.api.v1.router import router as api_router
+from app.db.registry import *  # noqa: F403
 from app.core.config import settings
-from app.core.errors import register_exception_handlers
 from app.core.logging import setup_logging
+from app.api.v1.router import router as api_router
+from app.core.errors import register_exception_handlers
 
 setup_logging()
 app = FastAPI(
