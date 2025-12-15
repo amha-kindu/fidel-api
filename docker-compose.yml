@@ -11,6 +11,8 @@ services:
       ENV: ${ENV:-dev}
       DATABASE_URL: ${DATABASE_URL:-postgresql+asyncpg://postgres:postgres@db:5432/fidel}
       REDIS_URL: ${REDIS_URL:-redis://redis:6379/0}
+      RATE_LIMIT_STORAGE_URI: ${RATE_LIMIT_STORAGE_URI:-redis://redis:6379/0}
+      HISTORY_CACHE_TTL_S: ${HISTORY_CACHE_TTL_S:-60}
       INFERENCE_BASE_URL: ${INFERENCE_BASE_URL:-http://inference:8001}
       JWT_SECRET: ${JWT_SECRET:-changeme}
     ports:
@@ -27,7 +29,7 @@ services:
 
 
   db:
-    image: postgres:16-alpine
+    image: postgres:latest
     container_name: fidel-db
     environment:
       POSTGRES_USER: ${POSTGRES_USER:-postgres}
@@ -45,7 +47,7 @@ services:
     restart: unless-stopped
 
   redis:
-    image: redis:7-alpine
+    image: redis:latest
     container_name: fidel-redis
     ports:
       - "6379:6379"

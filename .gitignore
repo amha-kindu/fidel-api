@@ -71,4 +71,3 @@ docker-compose.override.yml
 # --- Tests / Reports ---
 reports/
 junit.xml
-
