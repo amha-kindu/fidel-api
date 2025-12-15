@@ -1,19 +1,18 @@
 from uuid import UUID
 
 from fastapi import Depends, HTTPException, status
-from fastapi.security import OAuth2PasswordBearer
+from fastapi.security import HTTPAuthorizationCredentials, HTTPBearer
 from sqlalchemy.ext.asyncio import AsyncSession
 from collections.abc import AsyncGenerator
 
 from app.core import security
-from app.core.config import settings
 from app.db.session import get_db
 from app.models.user import User
 from app.repositories import user_repo
 from app.schemas.auth import TokenPayload
 from app.services.inference_client import InferenceClient, inference_client
 
-oauth2_scheme = OAuth2PasswordBearer(tokenUrl=f"{settings.api_v1_prefix}/auth/login")
+bearer = HTTPBearer(auto_error=True)
 
 
 async def get_db_session() -> AsyncGenerator[AsyncSession, None]:
@@ -22,7 +21,7 @@ async def get_db_session() -> AsyncGenerator[AsyncSession, None]:
 
 
 async def get_current_user(
-    token: str = Depends(oauth2_scheme), db: AsyncSession = Depends(get_db_session)
+    creds: HTTPAuthorizationCredentials = Depends(bearer), db: AsyncSession = Depends(get_db_session)
 ) -> User:
     credentials_exception = HTTPException(
         status_code=status.HTTP_401_UNAUTHORIZED,
@@ -31,7 +30,7 @@ async def get_current_user(
     )
 
     try:
-        payload = security.decode_token(token)
+        payload = security.decode_token(creds.credentials)
         token_data = TokenPayload(**payload)
         user_id = UUID(token_data.sub)
     except Exception as exc:  # includes ValueError, ValidationError
