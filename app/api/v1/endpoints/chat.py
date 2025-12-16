@@ -93,10 +93,10 @@ async def chat_stream(
     async def event_generator() -> AsyncIterator[dict]:
         assistant_parts: list[str] = []
         async for chunk in inference.stream_chat(messages):
-            data = chunk.removeprefix("data: ")
+            data = orjson.loads(chunk.removeprefix("data: "))
             if data.strip() == "[DONE]":
                 break
-            assistant_parts.append(data)
+            assistant_parts.append(data.choices[0].delta.content)
             yield {"event": "message", "data": data}
 
         if assistant_parts:
