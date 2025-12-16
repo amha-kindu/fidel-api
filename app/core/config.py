@@ -1,3 +1,4 @@
+from typing import List
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
 class Settings(BaseSettings):
@@ -22,5 +23,16 @@ class Settings(BaseSettings):
     rate_limit_default: str = "100/minute"
     chat_rate_limit: str = "30/minute"
     auth_rate_limit: str = "20/minute"
+
+    cors_allow_origins: List[str] = []
+    cors_allow_credentials: bool = True
+    cors_allow_methods: List[str] = ["*"]
+    cors_allow_headers: List[str] = ["*"]
+
+    inference_model: str = "test-model"
+    inference_temperature: float = 0.7
+    inference_top_p: float = 0.9
+    inference_top_k: int = 50
+    inference_max_tokens: int = 1024
 
 settings = Settings()

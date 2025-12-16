@@ -30,8 +30,19 @@ class InferenceClient:
             with attempt:
                 async with self._client.stream(
                     "POST",
-                    "/chat/stream",
-                    json={"messages": list(messages)},
+                    "/v1/chat/completions",
+                    json={
+                        "model": settings.inference_model,
+                        "messages": list(messages),
+                        "temperature": settings.inference_temperature,
+                        "top_p": settings.inference_top_p,
+                        "top_k": settings.inference_top_k,
+                        "max_tokens": settings.inference_max_tokens,
+                        "stream": True,
+                        "stop": [
+                            "[DONE]"
+                        ]
+                    },
                 ) as response:
                     response.raise_for_status()
                     async for line in response.aiter_lines():
