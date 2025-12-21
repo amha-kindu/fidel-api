@@ -44,7 +44,7 @@ async def list_for_user(
     result = await session.execute(
         select(Conversation)
         .where(Conversation.user_id == user_id)
-        .order_by(Conversation.created_at.desc())
+        .order_by(Conversation.updated_at.desc())
         .offset(offset)
         .limit(limit)
     )

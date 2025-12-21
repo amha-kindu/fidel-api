@@ -4,8 +4,8 @@ from uuid import UUID, uuid4
 import pytest
 from httpx import AsyncClient
 
-from app.models.message import MessageRole
 from app.repositories import message_repo
+from app.models.message import MessageRole
 from tests.conftest import FakeInferenceClient
 
 
@@ -30,10 +30,11 @@ async def test_chat_stream_creates_conversation_and_persists_messages(
     client: AsyncClient, db_session
 ):
     _, token = await register_and_login(client)
+    new_conv_id = uuid4()
 
     async with client.stream(
         "POST",
-        "/api/v1/chat/stream",
+        f"/api/v1/chats/{new_conv_id}/stream",
         json={"message": "Hello"},
         headers=auth_header(token),
     ) as resp:
@@ -42,7 +43,7 @@ async def test_chat_stream_creates_conversation_and_persists_messages(
 
     assert resp.headers.get("x-conversation-id")
     conv_id = UUID(resp.headers["x-conversation-id"])
-    assert any("data: hi" in line for line in lines)
+    assert any('"content":"hi"' in line for line in lines)
 
     messages = await message_repo.list_for_conversation(db_session, conv_id, limit=10)
     assert len(messages) == 2
@@ -56,9 +57,10 @@ async def test_chat_stream_creates_conversation_and_persists_messages(
 @pytest.mark.integration
 async def test_chat_stream_reuses_conversation(client: AsyncClient, db_session):
     _, token = await register_and_login(client)
+    new_conv_id = uuid4()
     async with client.stream(
         "POST",
-        "/api/v1/chat/stream",
+        f"/api/v1/chats/{new_conv_id}/stream",
         json={"message": "First"},
         headers=auth_header(token),
     ) as resp1:
@@ -67,8 +69,8 @@ async def test_chat_stream_reuses_conversation(client: AsyncClient, db_session):
 
     async with client.stream(
         "POST",
-        "/api/v1/chat/stream",
-        json={"message": "Second", "conversation_id": conv_id},
+        f"/api/v1/chats/{conv_id}/stream",
+        json={"message": "Second"},
         headers=auth_header(token),
     ) as resp2:
         await resp2.aread()
@@ -81,19 +83,24 @@ async def test_chat_stream_reuses_conversation(client: AsyncClient, db_session):
 @pytest.mark.asyncio(loop_scope="session")
 @pytest.mark.integration
 async def test_chat_stream_requires_auth(client: AsyncClient):
-    resp = await client.post("/api/v1/chat/stream", json={"message": "Hi"})
+    resp = await client.post(f"/api/v1/chats/{uuid4()}/stream", json={"message": "Hi"})
     assert resp.status_code == HTTPStatus.UNAUTHORIZED
 
 
 @pytest.mark.asyncio(loop_scope="session")
 @pytest.mark.integration
 async def test_chat_stream_aggregates_chunks(client: AsyncClient, db_session, fake_inference_client: FakeInferenceClient):
-    fake_inference_client.chunks = ["data: hello ", "data: world", "[DONE]"]
+    fake_inference_client.chunks = [
+        'data: {"choices":[{"delta":{"content":"hello "}}]}',
+        'data: {"choices":[{"delta":{"content":"world"}}]}',
+        "[DONE]",
+    ]
     _, token = await register_and_login(client)
+    new_conv_id = uuid4()
 
     async with client.stream(
         "POST",
-        "/api/v1/chat/stream",
+        f"/api/v1/chats/{new_conv_id}/stream",
         json={"message": "Hi there"},
         headers=auth_header(token),
     ) as resp:
@@ -109,12 +116,15 @@ async def test_chat_stream_aggregates_chunks(client: AsyncClient, db_session, fa
 @pytest.mark.asyncio(loop_scope="session")
 @pytest.mark.integration
 async def test_chat_stream_respects_history_limit(client: AsyncClient, db_session, fake_inference_client: FakeInferenceClient):
-    fake_inference_client.chunks = ["data: ok", "[DONE]"]
+    fake_inference_client.chunks = [
+        'data: {"choices":[{"delta":{"content":"ok"}}]}',
+        "[DONE]",
+    ]
     _, token = await register_and_login(client)
 
     # create conversation and seed messages
     create_resp = await client.post(
-        "/api/v1/conversations",
+        "/api/v1/chats",
         json={"title": "History test"},
         headers=auth_header(token),
     )
@@ -129,8 +139,8 @@ async def test_chat_stream_respects_history_limit(client: AsyncClient, db_sessio
 
     async with client.stream(
         "POST",
-        "/api/v1/chat/stream",
-        json={"message": "New message", "conversation_id": conv_id, "max_history": 1},
+        f"/api/v1/chats/{conv_id}/stream",
+        json={"message": "New message", "max_history": 1},
         headers=auth_header(token),
     ) as resp:
         await resp.aread()
@@ -145,12 +155,16 @@ async def test_chat_stream_respects_history_limit(client: AsyncClient, db_sessio
 
 @pytest.mark.asyncio(loop_scope="session")
 @pytest.mark.integration
-async def test_chat_stream_rejects_unknown_conversation(client: AsyncClient):
+async def test_chat_stream_creates_conversation_for_unknown_id(client: AsyncClient):
     _, token = await register_and_login(client)
     bad_id = str(uuid4())
-    resp = await client.post(
-        "/api/v1/chat/stream",
-        json={"message": "Hi", "conversation_id": bad_id},
+    async with client.stream(
+        "POST",
+        f"/api/v1/chats/{bad_id}/stream",
+        json={"message": "Hi"},
         headers=auth_header(token),
-    )
-    assert resp.status_code == HTTPStatus.NOT_FOUND
+    ) as resp:
+        await resp.aread()
+    assert resp.status_code == HTTPStatus.OK
+    assert resp.headers.get("x-conversation-id")
+    assert resp.headers["x-conversation-id"] != bad_id

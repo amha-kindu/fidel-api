@@ -3,13 +3,15 @@ from types import SimpleNamespace
 
 import pytest
 from fastapi import HTTPException
+from fastapi.security import HTTPAuthorizationCredentials
 
 from app.api import deps
+from app.core.config import settings
 from app.core import security
 from app.services.auth_service import AuthService
-from app.services.conversation_service import ConversationService
 from app.services.inference_client import InferenceClient
 from app.repositories import user_repo, conversation_repo
+from app.services.conversation_service import ConversationService
 
 
 class DummySession:
@@ -30,7 +32,10 @@ async def test_get_current_user_invalid_token(monkeypatch):
     monkeypatch.setattr(security, "decode_token", fake_decode)
 
     with pytest.raises(HTTPException) as exc:
-        await deps.get_current_user(token="invalid", db=None)  # type: ignore[arg-type]
+        await deps.get_current_user(
+            creds=HTTPAuthorizationCredentials(scheme="Bearer", credentials="invalid"),
+            db=None,  # type: ignore[arg-type]
+        )
     assert exc.value.status_code == 401
 
 
@@ -48,7 +53,10 @@ async def test_get_current_user_success(monkeypatch):
     monkeypatch.setattr(security, "decode_token", fake_decode)
     monkeypatch.setattr(user_repo, "get_by_id", fake_get_by_id)
 
-    fetched = await deps.get_current_user(token="token", db=None)  # type: ignore[arg-type]
+    fetched = await deps.get_current_user(
+        creds=HTTPAuthorizationCredentials(scheme="Bearer", credentials="token"),
+        db=None,  # type: ignore[arg-type]
+    )
     assert fetched.email == user.email
 
 
@@ -198,7 +206,10 @@ async def test_inference_client_stream_chat_mocked(monkeypatch):
 
     def fake_stream(method, url, json):
         assert method == "POST"
-        assert url == "/chat/stream"
+        assert url == "/v1/chat/completions"
+        assert json["model"] == settings.inference_model
+        assert json["messages"] == [{"role": "user", "content": "hi"}]
+        assert json["stream"] is True
         return DummyResponse(["data: hello", "data: [DONE]"])
 
     client = InferenceClient(base_url="http://test")

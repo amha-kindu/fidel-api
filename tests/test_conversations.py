@@ -27,7 +27,7 @@ async def test_conversation_crud_flow(client: AsyncClient):
 
     # create
     create_resp = await client.post(
-        "/api/v1/conversations",
+        "/api/v1/chats",
         json={"title": "First chat"},
         headers=auth_header(token),
     )
@@ -39,28 +39,32 @@ async def test_conversation_crud_flow(client: AsyncClient):
 
     # get
     get_resp = await client.get(
-        f"/api/v1/conversations/{conv['id']}",
+        f"/api/v1/chats/{conv['id']}",
         headers=auth_header(token),
     )
     assert get_resp.status_code == HTTPStatus.OK
-    assert get_resp.json()["id"] == conv["id"]
+    payload = get_resp.json()
+    assert payload["items"] == []
+    assert payload["total"] == 0
 
     # list
-    list_resp = await client.get("/api/v1/conversations", headers=auth_header(token))
+    list_resp = await client.get("/api/v1/chats", headers=auth_header(token))
     assert list_resp.status_code == HTTPStatus.OK
-    items = list_resp.json()
+    list_payload = list_resp.json()
+    items = list_payload["items"]
     assert any(item["id"] == conv["id"] for item in items)
+    assert list_payload["total"] >= 1
 
     # delete
     delete_resp = await client.delete(
-        f"/api/v1/conversations/{conv['id']}",
+        f"/api/v1/chats/{conv['id']}",
         headers=auth_header(token),
     )
     assert delete_resp.status_code == HTTPStatus.NO_CONTENT
 
     # now 404
     get_resp = await client.get(
-        f"/api/v1/conversations/{conv['id']}",
+        f"/api/v1/chats/{conv['id']}",
         headers=auth_header(token),
     )
     assert get_resp.status_code == HTTPStatus.NOT_FOUND
@@ -73,16 +77,18 @@ async def test_conversations_pagination_and_order(client: AsyncClient):
     titles = ["Conv A", "Conv B", "Conv C"]
     for title in titles:
         resp = await client.post(
-            "/api/v1/conversations",
+            "/api/v1/chats",
             json={"title": title},
             headers=auth_header(token),
         )
         assert resp.status_code == HTTPStatus.CREATED
 
-    list_resp = await client.get("/api/v1/conversations?limit=2", headers=auth_header(token))
+    list_resp = await client.get("/api/v1/chats?limit=2", headers=auth_header(token))
     assert list_resp.status_code == HTTPStatus.OK
-    items = list_resp.json()
+    list_payload = list_resp.json()
+    items = list_payload["items"]
     assert len(items) == 2
+    assert list_payload["total"] >= 3
 
     # ensure sorted desc by created_at (latest first)
     created_times = [item["created_at"] for item in items]
@@ -92,13 +98,13 @@ async def test_conversations_pagination_and_order(client: AsyncClient):
 @pytest.mark.asyncio(loop_scope="session")
 @pytest.mark.integration
 async def test_conversation_requires_auth(client: AsyncClient):
-    resp = await client.post("/api/v1/conversations", json={"title": "Nope"})
+    resp = await client.post("/api/v1/chats", json={"title": "Nope"})
     assert resp.status_code == HTTPStatus.UNAUTHORIZED
 
-    resp = await client.get("/api/v1/conversations")
+    resp = await client.get("/api/v1/chats")
     assert resp.status_code == HTTPStatus.UNAUTHORIZED
 
-    resp = await client.get("/api/v1/conversations/some-id", headers=auth_header("bad"))
+    resp = await client.get("/api/v1/chats/some-id", headers=auth_header("bad"))
     assert resp.status_code == HTTPStatus.UNAUTHORIZED
 
 
@@ -109,7 +115,7 @@ async def test_conversation_access_is_user_scoped(client: AsyncClient):
     _, token_user2 = await register_and_login(client)
 
     create_resp = await client.post(
-        "/api/v1/conversations",
+        "/api/v1/chats",
         json={"title": "User1 convo"},
         headers=auth_header(token_user1),
     )
@@ -117,13 +123,13 @@ async def test_conversation_access_is_user_scoped(client: AsyncClient):
 
     # user2 cannot see it
     get_resp = await client.get(
-        f"/api/v1/conversations/{conv_id}",
+        f"/api/v1/chats/{conv_id}",
         headers=auth_header(token_user2),
     )
     assert get_resp.status_code == HTTPStatus.NOT_FOUND
 
     delete_resp = await client.delete(
-        f"/api/v1/conversations/{conv_id}",
+        f"/api/v1/chats/{conv_id}",
         headers=auth_header(token_user2),
     )
     assert delete_resp.status_code == HTTPStatus.NOT_FOUND

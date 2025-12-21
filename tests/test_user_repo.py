@@ -2,9 +2,9 @@ import uuid
 
 import pytest
 
-from app.repositories import user_repo
 from app.core import security
 from app.models.user import User
+from app.repositories import user_repo
 
 
 @pytest.mark.asyncio(loop_scope="session")
