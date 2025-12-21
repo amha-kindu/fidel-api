@@ -1,9 +1,9 @@
 from uuid import UUID
+from collections.abc import AsyncGenerator
 
+from sqlalchemy.ext.asyncio import AsyncSession
 from fastapi import Depends, HTTPException, status
 from fastapi.security import HTTPAuthorizationCredentials, HTTPBearer
-from sqlalchemy.ext.asyncio import AsyncSession
-from collections.abc import AsyncGenerator
 
 from app.core import security
 from app.db.session import get_db

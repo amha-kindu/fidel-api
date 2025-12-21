@@ -1,16 +1,16 @@
 from fastapi import FastAPI, Request
+from slowapi.errors import RateLimitExceeded
 from fastapi.openapi.utils import get_openapi
+from slowapi.middleware import SlowAPIMiddleware
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse, ORJSONResponse
 
 from app.db.registry import *  # noqa: F403
 from app.core.config import settings
+from app.core.rate_limit import limiter
 from app.core.logging import setup_logging
 from app.api.v1.router import router as api_router
 from app.core.errors import register_exception_handlers
-from app.core.rate_limit import limiter
-from slowapi.errors import RateLimitExceeded
-from slowapi.middleware import SlowAPIMiddleware
 
 setup_logging()
 app = FastAPI(

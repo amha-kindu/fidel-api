@@ -1,16 +1,16 @@
-from typing import AsyncIterator, Iterable
+from typing import AsyncIterator, Iterable, Optional
 
 import httpx
 import structlog
+from app.core.config import settings
 from tenacity import AsyncRetrying, retry_if_exception_type, stop_after_attempt, wait_exponential
 
-from app.core.config import settings
 
 logger = structlog.get_logger(__name__)
 
 
 class InferenceClient:
-    def __init__(self, base_url: str | None = None, timeout: float | None = None):
+    def __init__(self, base_url: Optional[str] = None, timeout: Optional[float] = None):
         self.base_url = base_url or settings.inference_base_url
         self.timeout = timeout or settings.inference_timeout_s
         self._client = httpx.AsyncClient(base_url=self.base_url, timeout=self.timeout)

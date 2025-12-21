@@ -1,4 +1,6 @@
 import structlog
+from typing import Optional
+
 from redis.asyncio import Redis
 from redis.exceptions import RedisError
 
@@ -6,10 +8,10 @@ from app.core.config import settings
 
 logger = structlog.get_logger(__name__)
 
-_redis_client: Redis | None = None
+_redis_client: Optional[Redis] = None
 
 
-async def get_redis_client() -> Redis | None:
+async def get_redis_client() -> Optional[Redis]:
     """Lazily return a Redis client; return None if unavailable."""
     global _redis_client
     if _redis_client is None:

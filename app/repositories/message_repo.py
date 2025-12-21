@@ -1,5 +1,5 @@
-from typing import Iterable, Optional
 from uuid import UUID
+from typing import Iterable, Optional
 
 from sqlalchemy import func, select
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -13,8 +13,8 @@ async def create(
     conversation_id: UUID,
     role: MessageRole,
     content: str,
-    token_count: int | None = None,
-    metadata: dict | None = None,
+    token_count: Optional[int] = None,
+    metadata: Optional[dict] = None,
 ) -> Message:
     message = Message(
         conversation_id=conversation_id,
@@ -29,13 +29,19 @@ async def create(
     return message
 
 
-async def bulk_create(session: AsyncSession, messages: Iterable[Message]) -> None:
+async def bulk_create(
+    session: AsyncSession,
+    messages: Iterable[Message]
+) -> None:
     session.add_all(list(messages))
     await session.commit()
 
 
 async def list_for_conversation(
-    session: AsyncSession, conversation_id: UUID, limit: int = 20, offset: int = 0
+    session: AsyncSession,
+    conversation_id: UUID,
+    limit: int = 20,
+    offset: int = 0
 ) -> list[Message]:
     result = await session.execute(
         select(Message)
@@ -48,7 +54,9 @@ async def list_for_conversation(
 
 
 async def get_last_message(
-    session: AsyncSession, conversation_id: UUID, role: MessageRole | None = None
+    session: AsyncSession,
+    conversation_id: UUID,
+    role: Optional[MessageRole] = None
 ) -> Optional[Message]:
     stmt = select(Message).where(Message.conversation_id == conversation_id)
     if role:
@@ -58,7 +66,10 @@ async def get_last_message(
     return result.scalar_one_or_none()
 
 
-async def count_for_conversation(session: AsyncSession, conversation_id: UUID) -> int:
+async def count_for_conversation(
+    session: AsyncSession,
+    conversation_id: UUID
+) -> int:
     result = await session.execute(
         select(func.count()).select_from(Message).where(Message.conversation_id == conversation_id)
     )

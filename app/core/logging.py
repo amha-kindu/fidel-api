@@ -1,6 +1,5 @@
-from logging.config import dictConfig
-
 import structlog
+from logging.config import dictConfig
 
 
 def setup_logging() -> None:

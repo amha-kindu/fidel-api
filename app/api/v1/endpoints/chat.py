@@ -3,24 +3,24 @@ import structlog
 from uuid import UUID
 from typing import AsyncIterator
 
-from fastapi import APIRouter, Depends, HTTPException, Request, status, Query
-from sse_starlette.sse import EventSourceResponse
+from redis.exceptions import RedisError
 from sqlalchemy.ext.asyncio import AsyncSession
+from sse_starlette.sse import EventSourceResponse
+from fastapi import APIRouter, Depends, HTTPException, Request, status, Query
 
-from app.api.deps import get_current_user, get_db_session, get_inference_client
-from app.models.message import MessageRole
 from app.models.user import User
+from app.core.config import settings
+from app.core.rate_limit import limiter
 from app.schemas.chat import ChatRequest
-from app.schemas.conversation import ConversationCreate
+from app.repositories import message_repo
+from app.models.message import MessageRole
+from app.core.cache import get_redis_client
+from app.services.inference_client import InferenceClient
+from app.services.history_service import get_recent_history
 from app.schemas.message import MessageListResponse, MessageRead
 from app.services.conversation_service import ConversationService
-from app.services.history_service import get_recent_history
-from app.services.inference_client import InferenceClient
-from app.repositories import message_repo
-from app.core.rate_limit import limiter
-from app.core.config import settings
-from app.core.cache import get_redis_client
-from redis.exceptions import RedisError
+from app.api.deps import get_current_user, get_db_session, get_inference_client
+from app.schemas.conversation import ConversationCreate, ConversationListResponse, ConversationRead
 
 logger = structlog.get_logger(__name__)
 
@@ -63,18 +63,19 @@ async def _invalidate_history_cache(conversation_id: UUID) -> None:
         pass
 
 
-@router.post("/stream")
+@router.post("/{conversation_id}/stream")
 @limiter.limit(settings.chat_rate_limit)
 async def chat_stream(
     request: Request,  # required for rate limit keying
     payload: ChatRequest,
+    conversation_id: UUID,
     db: AsyncSession = Depends(get_db_session),
     inference: InferenceClient = Depends(get_inference_client),
     current_user: User = Depends(get_current_user),
-):
+) -> EventSourceResponse:
     conversation_service = ConversationService(db, current_user)
     try:
-        conversation = await conversation_service.get_conversation(payload.conversation_id)
+        conversation = await conversation_service.get_conversation(conversation_id)
     except HTTPException:
         conversation = await conversation_service.create_conversation(
             ConversationCreate(title=payload.message[:255])
@@ -146,12 +147,42 @@ async def chat_stream(
         "chat.stream.start",
         conversation_id=str(conversation.id),
         user_id=str(current_user.id),
-        has_existing=bool(payload.conversation_id),
+        has_existing=bool(conversation.id),
     )
     return EventSourceResponse(event_generator(), headers=headers, status_code=status.HTTP_200_OK)
 
+@router.get("", response_model=ConversationListResponse)
+@limiter.limit(settings.rate_limit_default)
+async def get_conversations(
+    request: Request,  # required for rate limit keying
+    limit: int = Query(20, ge=1, le=100),
+    offset: int = Query(0, ge=0),
+    db: AsyncSession = Depends(get_db_session),
+    current_user: User = Depends(get_current_user),
+) -> ConversationListResponse:
+    service = ConversationService(db, current_user)
+    conversations = await service.list_conversations(limit=limit, offset=offset)
+    total = await service.count_for_user()
+    return ConversationListResponse(
+        items=[ConversationRead.model_validate(c) for c in conversations],
+        total = total
+    )
+
+@router.post("", response_model=ConversationRead, status_code=status.HTTP_201_CREATED)
+@limiter.limit(settings.rate_limit_default)
+async def create_conversation(
+    request: Request,  # required for rate limit keying
+    payload: ConversationCreate,
+    db: AsyncSession = Depends(get_db_session),
+    current_user: User = Depends(get_current_user),
+) -> ConversationRead:
+    service = ConversationService(db, current_user)
+    conv = await service.create_conversation(payload)
+    return ConversationRead.model_validate(conv)
+
+
 @router.get("/{conversation_id}", response_model=MessageListResponse)
-@limiter.limit(settings.chat_rate_limit)
+@limiter.limit(settings.rate_limit_default)
 async def get_chat_history(
     request: Request,  # required for rate limit keying
     conversation_id: UUID,
@@ -159,11 +190,26 @@ async def get_chat_history(
     offset: int = Query(0, ge=0),
     db: AsyncSession = Depends(get_db_session),
     current_user: User = Depends(get_current_user),
-):
-    # Ensure conversation belongs to user by fetching last message; less overhead than loading whole convo
+) -> MessageListResponse:
+    service = ConversationService(db, current_user)
+    conversation = await service.get_conversation(conversation_id)
+    if conversation is None:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Not found")
+
     messages = await message_repo.list_for_conversation(db, conversation_id, limit=limit, offset=offset)
     total = await message_repo.count_for_conversation(db, conversation_id)
     return MessageListResponse(
         items=[MessageRead.model_validate(m) for m in messages],
         total=total,
     )
+
+@router.delete("/{conversation_id}", status_code=status.HTTP_204_NO_CONTENT)
+@limiter.limit(settings.rate_limit_default)
+async def delete_conversation(
+    request: Request,  # required for rate limit keying
+    conversation_id: UUID,
+    db: AsyncSession = Depends(get_db_session),
+    current_user: User = Depends(get_current_user),
+) -> None:
+    service = ConversationService(db, current_user)
+    await service.delete_conversation(conversation_id)

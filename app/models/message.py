@@ -4,13 +4,14 @@ from datetime import datetime
 from typing import TYPE_CHECKING
 
 import sqlalchemy as sa
-from sqlalchemy import DateTime, Enum, ForeignKey, Integer, Text
 from sqlalchemy.dialects.postgresql import JSONB, UUID
 from sqlalchemy.orm import Mapped, mapped_column, relationship
+from sqlalchemy import DateTime, Enum, ForeignKey, Integer, Text
 
 from app.db.base import Base
 if TYPE_CHECKING:
     from app.models.conversation import Conversation  # typing-only
+
 
 class MessageRole(str, enum.Enum):
     USER = "user"

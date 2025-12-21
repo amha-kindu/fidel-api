@@ -1,12 +1,13 @@
-from datetime import datetime
 from uuid import UUID
+from typing import Optional
+from datetime import datetime
 
 from pydantic import BaseModel, ConfigDict
 
 
 class ConversationBase(BaseModel):
-    title: str | None = None
-    last_message: str | None = None
+    title: Optional[str] = None
+    last_message: Optional[str] = None
 
 
 class ConversationCreate(ConversationBase):

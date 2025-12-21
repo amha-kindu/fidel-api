@@ -4,11 +4,12 @@ import structlog
 from fastapi import HTTPException, status
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from app.repositories import user_repo
-from app.schemas.auth import Token
-from app.schemas.user import UserCreate
 from app.core import security
 from app.models.user import User
+from app.schemas.auth import Token
+from app.repositories import user_repo
+from app.schemas.user import UserCreate
+
 
 logger = structlog.get_logger(__name__)
 

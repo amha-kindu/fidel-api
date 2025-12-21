@@ -1,5 +1,3 @@
-from typing import Optional
-from uuid import UUID
 
 from pydantic import BaseModel, Field
 
@@ -10,7 +8,6 @@ class ChatMessage(BaseModel):
 
 
 class ChatRequest(BaseModel):
-    conversation_id: Optional[UUID] = None
     message: str
     max_history: int = Field(default=20, ge=0, le=100)
 
