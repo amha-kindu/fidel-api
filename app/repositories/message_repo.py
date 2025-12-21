@@ -1,7 +1,7 @@
 from typing import Iterable, Optional
 from uuid import UUID
 
-from sqlalchemy import select
+from sqlalchemy import func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.models.message import Message, MessageRole
@@ -35,12 +35,13 @@ async def bulk_create(session: AsyncSession, messages: Iterable[Message]) -> Non
 
 
 async def list_for_conversation(
-    session: AsyncSession, conversation_id: UUID, limit: int = 20
+    session: AsyncSession, conversation_id: UUID, limit: int = 20, offset: int = 0
 ) -> list[Message]:
     result = await session.execute(
         select(Message)
         .where(Message.conversation_id == conversation_id)
         .order_by(Message.created_at.desc())
+        .offset(offset)
         .limit(limit)
     )
     return list(reversed(result.scalars().all()))
@@ -55,3 +56,10 @@ async def get_last_message(
     stmt = stmt.order_by(Message.created_at.desc()).limit(1)
     result = await session.execute(stmt)
     return result.scalar_one_or_none()
+
+
+async def count_for_conversation(session: AsyncSession, conversation_id: UUID) -> int:
+    result = await session.execute(
+        select(func.count()).select_from(Message).where(Message.conversation_id == conversation_id)
+    )
+    return int(result.scalar_one() or 0)

@@ -31,7 +31,15 @@ class ConversationService:
             self.session, user_id=self.user.id, limit=limit, offset=offset
         )
 
-    async def get_conversation(self, conversation_id: UUID):
+    async def count_for_user(self):
+        return await conversation_repo.count_for_user(
+            self.session,
+            user_id=self.user.id
+        )
+
+    async def get_conversation(self, conversation_id: UUID | None):
+        if not conversation_id:
+            raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Not found")
         conversation = await conversation_repo.get_for_user(
             self.session, conversation_id=conversation_id, user_id=self.user.id
         )
@@ -48,3 +56,14 @@ class ConversationService:
         logger.info(
             "conversation.deleted", conversation_id=str(conversation_id), user_id=str(self.user.id)
         )
+
+    async def update_conversation(self, conversation_id: UUID, payload: ConversationCreate | None = None):
+        title = payload.title if payload else None
+        last_message = payload.last_message if payload else None
+        conversation = await conversation_repo.update(
+            self.session, conversation_id=conversation_id, user_id=self.user.id, title=title, last_message=last_message
+        )
+        logger.info(
+            "conversation.updated", conversation_id=str(conversation.id), user_id=str(self.user.id)
+        )
+        return conversation

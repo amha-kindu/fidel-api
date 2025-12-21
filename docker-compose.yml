@@ -26,7 +26,8 @@ services:
     volumes:
       - .:/app
     command: bash -lc "alembic upgrade head && uvicorn app.main:app --host 0.0.0.0 --port 8000 --reload"
-
+    networks:
+      - fidel
 
   db:
     image: postgres:latest
@@ -45,6 +46,8 @@ services:
       timeout: 3s
       retries: 20
     restart: unless-stopped
+    networks:
+      - fidel
 
   adminer:
     image: adminer:latest
@@ -56,6 +59,8 @@ services:
     environment:
       ADMINER_DEFAULT_SERVER: db
     restart: unless-stopped
+    networks:
+      - fidel
 
   redis:
     image: redis:latest
@@ -68,6 +73,11 @@ services:
       timeout: 3s
       retries: 20
     restart: unless-stopped
+    networks:
+      - fidel
 
 volumes:
   pgdata:
+
+networks:
+  fidel:

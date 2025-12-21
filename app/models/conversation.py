@@ -23,6 +23,8 @@ class Conversation(Base):
         nullable=False,
     )
     title: Mapped[str | None] = mapped_column(String(255), nullable=True)
+    last_message: Mapped[str | None] = mapped_column(String(255), nullable=True)
+
     created_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True), server_default=sa.text("clock_timestamp()"), nullable=False
     )

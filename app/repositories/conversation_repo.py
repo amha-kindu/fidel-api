@@ -1,7 +1,8 @@
 from typing import Optional, cast
 from uuid import UUID
 
-from sqlalchemy import delete, select
+from fastapi import HTTPException, status
+from sqlalchemy import delete, select, func
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.models.conversation import Conversation
@@ -14,6 +15,15 @@ async def create(session: AsyncSession, user_id: UUID, title: str | None = None)
     await session.refresh(conversation)
     return conversation
 
+async def update(session: AsyncSession, conversation_id: UUID, user_id: UUID, title: str | None = None, last_message: str | None = None) -> Conversation:
+    conversation = await get_for_user(session, conversation_id, user_id)
+    if conversation is None:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Not found")
+    conversation.title = title
+    conversation.last_message = last_message
+    await session.commit()
+    await session.refresh(conversation)
+    return conversation
 
 async def list_for_user(
     session: AsyncSession, user_id: UUID, limit: int = 20, offset: int = 0
@@ -49,3 +59,9 @@ async def delete_for_user(session: AsyncSession, conversation_id: UUID, user_id:
     deleted_ids = result.scalars().all()
     await session.commit()
     return len(deleted_ids)
+
+async def count_for_user(session: AsyncSession, user_id: UUID):
+    result = await session.execute(
+        select(func.count()).select_from(Conversation).where(Conversation.user_id == user_id)
+    )
+    return int(result.scalar_one() or 0)

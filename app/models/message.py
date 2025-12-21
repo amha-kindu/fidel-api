@@ -3,7 +3,6 @@ import uuid
 from datetime import datetime
 from typing import TYPE_CHECKING
 
-
 import sqlalchemy as sa
 from sqlalchemy import DateTime, Enum, ForeignKey, Integer, Text
 from sqlalchemy.dialects.postgresql import JSONB, UUID
