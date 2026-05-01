@@ -1,8 +1,9 @@
 from uuid import UUID
 from collections.abc import AsyncGenerator
 
+from pydantic import ValidationError
 from sqlalchemy.ext.asyncio import AsyncSession
-from fastapi import Depends, HTTPException, status
+from fastapi import Depends, HTTPException, Request, status
 from fastapi.security import HTTPAuthorizationCredentials, HTTPBearer
 
 from app.core import security
@@ -10,7 +11,7 @@ from app.db.session import get_db
 from app.models.user import User
 from app.repositories import user_repo
 from app.schemas.auth import TokenPayload
-from app.services.inference_client import InferenceClient, inference_client
+from app.services.inference_client import InferenceClient
 
 bearer = HTTPBearer(auto_error=True)
 
@@ -33,7 +34,7 @@ async def get_current_user(
         payload = security.decode_token(creds.credentials)
         token_data = TokenPayload(**payload)
         user_id = UUID(token_data.sub)
-    except Exception as exc:  # includes ValueError, ValidationError
+    except (ValueError, ValidationError) as exc:
         raise credentials_exception from exc
 
     user = await user_repo.get_by_id(db, user_id)
@@ -42,5 +43,5 @@ async def get_current_user(
     return user
 
 
-def get_inference_client() -> InferenceClient:
-    return inference_client
+def get_inference_client(request: Request) -> InferenceClient:
+    return request.app.state.inference_client

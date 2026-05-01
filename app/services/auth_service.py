@@ -18,6 +18,15 @@ class AuthService:
     def __init__(self, session: AsyncSession):
         self.session = session
 
+    async def _commit_and_refresh(self, *entities: object) -> None:
+        try:
+            await self.session.commit()
+        except Exception:
+            await self.session.rollback()
+            raise
+        for entity in entities:
+            await self.session.refresh(entity)
+
     async def register_user(self, payload: UserCreate) -> User:
         existing = await user_repo.get_by_email(self.session, payload.email)
         if existing:
@@ -29,6 +38,7 @@ class AuthService:
 
         hashed = security.get_password_hash(payload.password)
         user = await user_repo.create(self.session, email=payload.email, password_hash=hashed)
+        await self._commit_and_refresh(user)
         logger.info("auth.register.success", user_id=str(user.id), email=user.email)
         return user
 

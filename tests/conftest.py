@@ -1,7 +1,7 @@
 
 from typing import Optional
 from collections.abc import AsyncGenerator
-from datetime import datetime, timedelta
+from datetime import datetime, timedelta, timezone
 from types import SimpleNamespace
 from uuid import UUID, uuid4
 
@@ -39,10 +39,19 @@ limiter.enabled = False
 
 
 class DummySession:
+    def __init__(self) -> None:
+        self.commit_calls = 0
+        self.rollback_calls = 0
+
     async def commit(self):
+        self.commit_calls += 1
         return None
 
     async def refresh(self, obj):
+        return None
+
+    async def rollback(self):
+        self.rollback_calls += 1
         return None
 
     async def close(self):
@@ -58,7 +67,7 @@ class InMemoryStore:
         self.users_by_email: dict[str, SimpleNamespace] = {}
         self.conversations_by_id: dict[UUID, SimpleNamespace] = {}
         self.messages: list[SimpleNamespace] = []
-        self._clock = datetime.utcnow()
+        self._clock = datetime.now(timezone.utc)
         self._tick = 0
 
     def now(self) -> datetime:

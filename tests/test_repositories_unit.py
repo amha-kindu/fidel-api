@@ -1,9 +1,7 @@
-from datetime import datetime
+from datetime import datetime, timezone
 from uuid import uuid4
 
 import pytest
-from fastapi import HTTPException
-
 from app.models.conversation import Conversation
 from app.models.message import Message, MessageRole
 from app.models.user import User
@@ -40,6 +38,7 @@ class FakeSession:
         self.added = []
         self.add_all_items = None
         self.commit_called = 0
+        self.flush_called = 0
         self.refresh_called = []
         self.executed = []
 
@@ -55,6 +54,9 @@ class FakeSession:
     def add_all(self, items):
         self.add_all_items = list(items)
 
+    async def flush(self):
+        self.flush_called += 1
+
     async def commit(self):
         self.commit_called += 1
 
@@ -65,7 +67,7 @@ class FakeSession:
 @pytest.mark.repo_unit
 @pytest.mark.asyncio
 async def test_user_repo_get_and_create():
-    user = User(id=uuid4(), email="a@example.com", password_hash="x", created_at=datetime.utcnow())
+    user = User(id=uuid4(), email="a@example.com", password_hash="x", created_at=datetime.now(timezone.utc))
     session = FakeSession(results=[FakeResult(scalar=user), FakeResult(scalar=None)])
 
     fetched = await user_repo.get_by_email(session, "a@example.com")
@@ -78,13 +80,13 @@ async def test_user_repo_get_and_create():
     assert isinstance(created, User)
     assert created.email == "b@example.com"
     assert session.added
-    assert session.commit_called == 1
+    assert session.flush_called == 1
 
 
 @pytest.mark.repo_unit
 @pytest.mark.asyncio
 async def test_conversation_repo_crud_and_count(monkeypatch):
-    now = datetime.utcnow()
+    now = datetime.now(timezone.utc)
     conv = Conversation(
         id=uuid4(),
         user_id=uuid4(),
@@ -122,14 +124,14 @@ async def test_conversation_repo_crud_and_count(monkeypatch):
         return None
 
     monkeypatch.setattr(conversation_repo, "get_for_user", fake_get_for_user)
-    with pytest.raises(HTTPException):
-        await conversation_repo.update(session, conversation_id=uuid4(), user_id=uuid4(), title="x")
+    missing = await conversation_repo.update(session, conversation_id=uuid4(), user_id=uuid4(), title="x")
+    assert missing is None
 
 
 @pytest.mark.repo_unit
 @pytest.mark.asyncio
 async def test_conversation_repo_update_success(monkeypatch):
-    now = datetime.utcnow()
+    now = datetime.now(timezone.utc)
     conv = Conversation(
         id=uuid4(),
         user_id=uuid4(),
@@ -149,7 +151,6 @@ async def test_conversation_repo_update_success(monkeypatch):
     )
     assert updated.title == "New"
     assert updated.last_message == "Hi"
-    assert session.commit_called == 1
 
 
 @pytest.mark.repo_unit
@@ -160,14 +161,14 @@ async def test_message_repo_helpers():
         conversation_id=uuid4(),
         role=MessageRole.USER,
         content="first",
-        created_at=datetime.utcnow(),
+        created_at=datetime.now(timezone.utc),
     )
     msg2 = Message(
         id=uuid4(),
         conversation_id=msg1.conversation_id,
         role=MessageRole.ASSISTANT,
         content="second",
-        created_at=datetime.utcnow(),
+        created_at=datetime.now(timezone.utc),
     )
     session = FakeSession(
         results=[
@@ -185,9 +186,11 @@ async def test_message_repo_helpers():
     )
     assert isinstance(created, Message)
     assert created.content == "hello"
+    assert session.flush_called == 1
 
     await message_repo.bulk_create(session, [msg1, msg2])
     assert session.add_all_items == [msg1, msg2]
+    assert session.flush_called == 2
 
     listed = await message_repo.list_for_conversation(session, msg1.conversation_id, limit=5, offset=0)
     assert listed == [msg1, msg2]

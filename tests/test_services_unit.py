@@ -8,8 +8,11 @@ from fastapi.security import HTTPAuthorizationCredentials
 from app.api import deps
 from app.core.config import settings
 from app.core import security
+from app.models.conversation import Conversation
+from app.models.message import MessageRole
 from app.services.auth_service import AuthService
 from app.services.inference_client import InferenceClient
+from app.services.chat_service import ChatService
 from app.repositories import user_repo, conversation_repo
 from app.services.conversation_service import ConversationService
 
@@ -17,16 +20,23 @@ from app.services.conversation_service import ConversationService
 class DummySession:
     """Lightweight stand-in for AsyncSession."""
 
+    def __init__(self) -> None:
+        self.rollback_calls = 0
+
     async def commit(self):
         return None
 
     async def refresh(self, obj):
         return None
 
+    async def rollback(self):
+        self.rollback_calls += 1
+        return None
+
 
 @pytest.mark.asyncio
 async def test_get_current_user_invalid_token(monkeypatch):
-    async def fake_decode(token):
+    def fake_decode(token):
         raise ValueError("bad token")
 
     monkeypatch.setattr(security, "decode_token", fake_decode)
@@ -72,7 +82,9 @@ async def test_get_db_session_generator(monkeypatch):
 
 
 def test_get_inference_client_singleton():
-    assert deps.get_inference_client() is deps.inference_client
+    inference = InferenceClient(base_url="http://test")
+    request = SimpleNamespace(app=SimpleNamespace(state=SimpleNamespace(inference_client=inference)))
+    assert deps.get_inference_client(request) is inference
 
 
 @pytest.mark.unit
@@ -220,3 +232,84 @@ async def test_inference_client_stream_chat_mocked(monkeypatch):
         chunks.append(chunk)
 
     assert chunks == ["data: hello", "data: [DONE]"]
+
+
+@pytest.mark.unit
+@pytest.mark.asyncio
+async def test_chat_service_rolls_back_on_assistant_persist_failure(monkeypatch):
+    user = SimpleNamespace(id=uuid.uuid4())
+    conversation = Conversation(user_id=user.id, title="chat")
+    conversation.id = uuid.uuid4()
+
+    async def fake_get_redis_client():
+        return None
+
+    async def fake_create_message(session, **kwargs):
+        if kwargs["role"] == MessageRole.ASSISTANT:
+            raise RuntimeError("db failed")
+        return SimpleNamespace(id=uuid.uuid4(), **kwargs)
+
+    monkeypatch.setattr("app.services.chat_service.get_redis_client", fake_get_redis_client)
+    monkeypatch.setattr("app.services.chat_service.message_repo.create", fake_create_message)
+
+    service = ChatService(DummySession(), user, InferenceClient(base_url="http://test"))
+
+    with pytest.raises(RuntimeError):
+        await service.persist_assistant_response(conversation, "hello")
+
+    assert service.session.rollback_calls == 1
+
+
+@pytest.mark.unit
+@pytest.mark.asyncio
+async def test_chat_service_cache_versioning_refreshes_history(monkeypatch):
+    user = SimpleNamespace(id=uuid.uuid4())
+    session = DummySession()
+    conversation = Conversation(user_id=user.id, title="chat")
+    conversation.id = uuid.uuid4()
+
+    class FakeRedis:
+        def __init__(self):
+            self.data = {}
+
+        async def get(self, key):
+            return self.data.get(key)
+
+        async def set(self, key, value, ex=None):
+            self.data[key] = value
+
+        async def incr(self, key):
+            current = int(self.data.get(key, b"0"))
+            current += 1
+            self.data[key] = str(current).encode("utf-8")
+            return current
+
+    fake_redis = FakeRedis()
+    history_batches = [
+        [SimpleNamespace(role=MessageRole.USER, content="Hello")],
+        [
+            SimpleNamespace(role=MessageRole.USER, content="Hello"),
+            SimpleNamespace(role=MessageRole.ASSISTANT, content="Hi"),
+        ],
+    ]
+
+    async def fake_get_redis_client():
+        return fake_redis
+
+    async def fake_history(*args, **kwargs):
+        return history_batches.pop(0)
+
+    monkeypatch.setattr("app.services.chat_service.get_redis_client", fake_get_redis_client)
+    monkeypatch.setattr("app.services.chat_service.get_recent_history", fake_history)
+
+    service = ChatService(session, user, InferenceClient(base_url="http://test"))
+
+    first_messages = await service._build_messages(conversation.id, 20)
+    await service._bump_history_version(conversation.id)
+    second_messages = await service._build_messages(conversation.id, 20)
+
+    assert first_messages == [{"role": "user", "content": "Hello"}]
+    assert second_messages == [
+        {"role": "user", "content": "Hello"},
+        {"role": "assistant", "content": "Hi"},
+    ]

@@ -21,11 +21,10 @@ async def create(
         role=role,
         content=content,
         token_count=token_count,
-        metadata=metadata,
+        extra=metadata,
     )
     session.add(message)
-    await session.commit()
-    await session.refresh(message)
+    await session.flush()
     return message
 
 
@@ -34,7 +33,7 @@ async def bulk_create(
     messages: Iterable[Message]
 ) -> None:
     session.add_all(list(messages))
-    await session.commit()
+    await session.flush()
 
 
 async def list_for_conversation(

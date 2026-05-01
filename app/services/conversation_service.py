@@ -19,11 +19,24 @@ class ConversationService:
         self.session = session
         self.user = user
 
+    async def _commit(self) -> None:
+        try:
+            await self.session.commit()
+        except Exception:
+            await self.session.rollback()
+            raise
+
+    async def _commit_and_refresh(self, *entities: object) -> None:
+        await self._commit()
+        for entity in entities:
+            await self.session.refresh(entity)
+
     async def create_conversation(self, payload: Optional[ConversationCreate] = None) -> Conversation:
         title = payload.title if payload else None
         conversation = await conversation_repo.create(
             self.session, user_id=self.user.id, title=title
         )
+        await self._commit_and_refresh(conversation)
         logger.info(
             "conversation.created", conversation_id=str(conversation.id), user_id=str(self.user.id)
         )
@@ -54,6 +67,7 @@ class ConversationService:
         )
         if deleted == 0:
             raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Not found")
+        await self._commit()
         logger.info(
             "conversation.deleted", conversation_id=str(conversation_id), user_id=str(self.user.id)
         )
@@ -64,6 +78,9 @@ class ConversationService:
         conversation = await conversation_repo.update(
             self.session, conversation_id=conversation_id, user_id=self.user.id, title=title, last_message=last_message
         )
+        if conversation is None:
+            raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Not found")
+        await self._commit_and_refresh(conversation)
         logger.info(
             "conversation.updated", conversation_id=str(conversation.id), user_id=str(self.user.id)
         )

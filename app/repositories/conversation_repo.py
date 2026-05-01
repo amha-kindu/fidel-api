@@ -1,7 +1,6 @@
 from uuid import UUID
 from typing import Optional, cast
 
-from fastapi import HTTPException, status
 from sqlalchemy import delete, select, func
 from sqlalchemy.ext.asyncio import AsyncSession
 
@@ -15,8 +14,7 @@ async def create(
 ) -> Conversation:
     conversation = Conversation(user_id=user_id, title=title)
     session.add(conversation)
-    await session.commit()
-    await session.refresh(conversation)
+    await session.flush()
     return conversation
 
 async def update(
@@ -25,14 +23,12 @@ async def update(
     user_id: UUID,
     title: Optional[str] = None,
     last_message: Optional[str] = None
-) -> Conversation:
+) -> Optional[Conversation]:
     conversation = await get_for_user(session, conversation_id, user_id)
     if conversation is None:
-        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Not found")
+        return None
     conversation.title = title
     conversation.last_message = last_message
-    await session.commit()
-    await session.refresh(conversation)
     return conversation
 
 async def list_for_user(
@@ -76,7 +72,6 @@ async def delete_for_user(
         .returning(Conversation.id)
     )
     deleted_ids = result.scalars().all()
-    await session.commit()
     return len(deleted_ids)
 
 

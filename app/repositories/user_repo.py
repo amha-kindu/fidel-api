@@ -30,6 +30,5 @@ async def create(
 ) -> User:
     user = User(email=email, password_hash=password_hash)
     session.add(user)
-    await session.commit()
-    await session.refresh(user)
+    await session.flush()
     return user
