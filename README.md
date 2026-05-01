@@ -1,112 +1,194 @@
-# Fidel API
+<div align="center">
+  <h1>Fidel API</h1>
+  <p><strong>Real-time FastAPI backend for conversational applications</strong></p>
+  <p>
+    Authentication, conversation management, SSE chat streaming, Redis-backed caching,
+    rate limiting, and an inference proxy layer in a single service.
+  </p>
+  <p>
+    <img src="https://img.shields.io/badge/Python-3.12%2B-3776AB?logo=python&logoColor=white" alt="Python 3.11+">
+    <img src="https://img.shields.io/badge/FastAPI-0.124-009688?logo=fastapi&logoColor=white" alt="FastAPI 0.124">
+    <img src="https://img.shields.io/badge/Pydantic-v2-E92063?logo=pydantic&logoColor=white" alt="Pydantic v2">
+    <img src="https://img.shields.io/badge/SQLAlchemy-2.0-D71F00?logo=sqlalchemy&logoColor=white" alt="SQLAlchemy 2.0">
+    <img src="https://img.shields.io/badge/PostgreSQL-Database-4169E1?logo=postgresql&logoColor=white" alt="PostgreSQL">
+    <img src="https://img.shields.io/badge/Redis-Cache%20%26%20Rate%20Limits-DC382D?logo=redis&logoColor=white" alt="Redis">
+    <img src="https://img.shields.io/badge/OpenAPI-Docs-6BA539?logo=openapiinitiative&logoColor=white" alt="OpenAPI">
+    <img src="https://img.shields.io/badge/Coverage-90%25%2B-brightgreen" alt="Coverage 90%+">
+  </p>
+</div>
 
-FastAPI backend for a ChatGPT-like Next.js frontend. It provides user auth with JWT, conversation/message management, chat streaming proxy to an inference backend, Redis-backed caching, and rate limiting. Project uses async SQLAlchemy, Postgres, Alembic migrations, and Pydantic v2.
+## Overview
 
-## Features
-- FastAPI + ORJSON responses
-- JWT auth (password hashing via passlib)
-- Conversations/messages models with async SQLAlchemy & Postgres
-- Streaming chat proxy endpoint (`/api/v1/chat/stream`) with history windowing
-- Redis caching for message history and SlowAPI rate limiting
-- Structured logging (structlog)
-- OpenAPI docs: Swagger UI at `/docs`, ReDoc at `/redoc`, OpenAPI JSON at `/openapi.json`
-- Test suite with pytest/pytest-asyncio and httpx
+Fidel API is a production-oriented FastAPI backend for ChatGPT-style experiences. It exposes authenticated APIs for users, conversations, and message history, then proxies streaming chat completions from an inference backend over Server-Sent Events.
 
-## Getting Started
+The codebase is structured around clear application layers:
+
+- `api` for HTTP routes and dependency wiring
+- `services` for orchestration and business logic
+- `repositories` for data access
+- `models` and `schemas` for persistence and contract boundaries
+- `core` for configuration, security, logging, caching, and rate limiting
+
+## Why This Project
+
+- JWT-based authentication with Argon2 password hashing
+- Conversation and message persistence with async SQLAlchemy and Postgres
+- Streaming chat via `POST /api/v1/chats/stream`
+- Optional conversation reuse through the `id` query parameter
+- Redis-backed history caching and SlowAPI rate limiting
+- Structured JSON logging with `structlog`
+- OpenAPI documentation out of the box
+- Test suite with coverage enforcement
+
+## Stack At A Glance
+
+| Layer | Technology |
+| --- | --- |
+| API | FastAPI, ORJSON responses, OpenAPI |
+| Validation | Pydantic v2, pydantic-settings |
+| Database | PostgreSQL, SQLAlchemy 2.x, Alembic |
+| Caching | Redis |
+| Auth | JWT, `python-jose`, Argon2 |
+| Streaming | SSE via `sse-starlette` |
+| HTTP Client | `httpx` |
+| Testing | `pytest`, `pytest-asyncio`, coverage |
+
+## API Surface
+
+| Method | Route | Purpose |
+| --- | --- | --- |
+| `POST` | `/api/v1/auth/register` | Create a user account |
+| `POST` | `/api/v1/auth/login` | Authenticate and return a bearer token |
+| `GET` | `/api/v1/users/me` | Fetch the current authenticated user |
+| `POST` | `/api/v1/chats` | Create a conversation |
+| `GET` | `/api/v1/chats` | List conversations |
+| `GET` | `/api/v1/chats/{id}` | Return conversation message history |
+| `DELETE` | `/api/v1/chats/{id}` | Delete a conversation |
+| `POST` | `/api/v1/chats/stream?id=<conversation_id>` | Stream an assistant reply and optionally reuse a conversation |
+| `GET` | `/health` | Basic healthcheck |
+
+Authentication uses:
+
+```http
+Authorization: Bearer <token>
+```
+
+Interactive docs are available at:
+
+- `/docs` for Swagger UI
+- `/redoc` for ReDoc
+- `/openapi.json` for the raw spec
+
+## Quick Start
+
 ### Prerequisites
-- Docker and docker-compose
-- Python 3.12+ (for local dev without Docker)
 
-### Environment
-Copy `.env.example` to `.env` and adjust as needed:
+- Python `3.12+`
+- Docker and Docker Compose
+- PostgreSQL and Redis if running outside Docker
+
+### Environment Setup
+
+Create a local environment file from the example:
+
 ```bash
 cp .env.example .env
 ```
-Key variables:
-- `DATABASE_URL` / `TEST_DATABASE_URL`
+
+Important settings:
+
+- `DATABASE_URL`
+- `TEST_DATABASE_URL`
 - `REDIS_URL`
 - `JWT_SECRET`
 - `INFERENCE_BASE_URL`
-- `RATE_LIMIT_STORAGE_URI` (set to `memory://` to disable Redis in dev/tests)
+- `RATE_LIMIT_STORAGE_URI`
 
-### Run with Docker Compose
+If you want in-memory rate limiting in development or tests, set:
+
+```env
+RATE_LIMIT_STORAGE_URI=memory://
+```
+
+## Run With Docker
+
+Bring the stack up from the repo root:
+
 ```bash
 docker-compose up --build
 ```
-Services:
-- API: http://localhost:8000
-- Postgres: localhost:5432
-- Redis: localhost:6379
-- Adminer: http://localhost:8080 (server: `db`, user/password from env)
 
-API docs:
-- Swagger: http://localhost:8000/docs
-- ReDoc: http://localhost:8000/redoc
-- OpenAPI JSON: http://localhost:8000/openapi.json
+Default local endpoints:
 
-### Local Dev (without Docker)
-1) Create venv & install deps:
-```bash
-python -m venv .venv
-source .venv/bin/activate  # or .venv\Scripts\activate on Windows
-pip install -r requirements.txt  # or `pip install .` if using pyproject extras
-```
-2) Start Postgres & Redis locally; ensure `DATABASE_URL`/`REDIS_URL` point to them.
-3) Run migrations:
+- API: `http://localhost:8000`
+- Swagger UI: `http://localhost:8000/docs`
+- ReDoc: `http://localhost:8000/redoc`
+- Adminer: `http://localhost:8080`
+
+## Local Development
+
+Install dependencies in your preferred Python environment, then run:
+
 ```bash
 alembic upgrade head
-```
-4) Run server:
-```bash
 uvicorn app.main:app --host 0.0.0.0 --port 8000 --reload
 ```
 
+When running locally, make sure Postgres and Redis are reachable from the values in `.env`.
+
 ## Project Structure
-```
+
+```text
 app/
-  api/              # FastAPI routers/endpoints
-  core/             # config, logging, security, rate limiting, errors
-  db/               # engine/session, migrations
-  models/           # SQLAlchemy models
-  repositories/     # data access helpers
-  schemas/          # Pydantic schemas
-  services/         # business logic, inference client, history
-  main.py           # FastAPI app factory & wiring
-tests/              # pytest suite (unit + integration)
-scripts/export_openapi.py  # generate static OpenAPI json
+  api/              # FastAPI routes and dependency wiring
+  core/             # config, logging, security, caching, rate limiting
+  db/               # session management and Alembic migrations
+  models/           # SQLAlchemy ORM models
+  repositories/     # persistence helpers
+  schemas/          # request/response schemas
+  services/         # business logic and orchestration
+  main.py           # app creation and lifespan wiring
+tests/              # unit and API tests
+scripts/            # utility scripts such as OpenAPI export
 ```
 
-## Key Endpoints (API v1)
-- `POST /api/v1/auth/register` — create user
-- `POST /api/v1/auth/login` — JWT bearer token
-- `GET /api/v1/users/me` — current user
-- `POST /api/v1/conversations` — create conversation
-- `GET /api/v1/conversations` — list conversations
-- `GET /api/v1/conversations/{id}` — fetch conversation
-- `DELETE /api/v1/conversations/{id}` — delete conversation
-- `POST /api/v1/chat/stream` — stream assistant reply (SSE proxy to inference backend)
-- `GET /health` — healthcheck
+## Testing
 
-Auth: Bearer token in `Authorization: Bearer <token>`. Swagger UI is preconfigured for HTTP bearer.
+Run the full test suite:
 
-Rate limiting: SlowAPI with defaults from env (`RATE_LIMIT_STORAGE_URI`, per-route limits). Redis recommended for production.
-
-## Running Tests
-Use test database/Redis URLs (or `memory://` for limiter):
 ```bash
 pytest
 ```
-Coverage target is configured at 90% in `pytest.ini`.
+
+The repository enforces:
+
+- strict pytest markers
+- HTML coverage output
+- minimum coverage threshold of `90%`
 
 ## OpenAPI Export
-Generate a static spec for frontend/CI:
+
+To export a static OpenAPI document from the repo root, ensure the repo root is on `PYTHONPATH` and run:
+
 ```bash
-python scripts/export_openapi.py
+PYTHONPATH=. python scripts/export_openapi.py
 ```
-Outputs `openapi.json` at repo root.
+
+This writes `openapi.json` at the project root.
 
 ## Production Notes
-- Run behind a reverse proxy/ingress that terminates TLS.
-- Set a strong `JWT_SECRET` and production DB/Redis credentials.
-- Use Redis for rate limiting and history caching; set `RATE_LIMIT_STORAGE_URI` accordingly.
-- Scale with multiple API replicas; keep DB pool and Redis accessible.
+
+- Run behind a reverse proxy or ingress that terminates TLS
+- Use a strong `JWT_SECRET`
+- Point `DATABASE_URL` and `REDIS_URL` at production-grade services
+- Use Redis for both history caching and distributed rate limiting
+- Keep the inference backend reachable and monitored separately from the API
+
+## Development Focus
+
+This codebase is optimized for:
+
+- preserving a stable API surface
+- keeping service and repository responsibilities clear
+- making streaming chat behavior testable
+- supporting iterative backend cleanup without breaking clients
