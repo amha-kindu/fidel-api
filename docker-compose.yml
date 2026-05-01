@@ -1,9 +1,12 @@
+name: fidel
+
 services:
   api:
     build:
       context: .
       dockerfile: Dockerfile
     container_name: fidel-api
+    image: fidel-api:1.0.0
     env_file:
       - .env
     environment:
@@ -13,7 +16,7 @@ services:
       REDIS_URL: ${REDIS_URL:-redis://redis:6379/0}
       RATE_LIMIT_STORAGE_URI: ${RATE_LIMIT_STORAGE_URI:-redis://redis:6379/0}
       HISTORY_CACHE_TTL_S: ${HISTORY_CACHE_TTL_S:-60}
-      INFERENCE_BASE_URL: ${INFERENCE_BASE_URL:-http://inference:8001}
+      INFERENCE_BASE_URL: ${INFERENCE_BASE_URL:-http://fidel-inference:7890}
       JWT_SECRET: ${JWT_SECRET:-changeme}
     ports:
       - "8000:8000"
@@ -27,7 +30,7 @@ services:
       - .:/app
     command: bash -lc "alembic upgrade head && uvicorn app.main:app --host 0.0.0.0 --port 8000 --reload"
     networks:
-      - fidel
+      - net
 
   db:
     image: postgres:latest
@@ -36,10 +39,8 @@ services:
       POSTGRES_USER: ${POSTGRES_USER:-postgres}
       POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-postgres}
       POSTGRES_DB: ${POSTGRES_DB:-fidel}
-    ports:
-      - "5432:5432"
     volumes:
-      - pgdata:/var/lib/postgresql/data
+      - pgdata:/var/lib/postgresql
     healthcheck:
       test: ["CMD-SHELL", "pg_isready -U $${POSTGRES_USER:-postgres} -d $${POSTGRES_DB:-fidel}"]
       interval: 5s
@@ -47,7 +48,7 @@ services:
       retries: 20
     restart: unless-stopped
     networks:
-      - fidel
+      - net
 
   adminer:
     image: adminer:latest
@@ -60,13 +61,13 @@ services:
       ADMINER_DEFAULT_SERVER: db
     restart: unless-stopped
     networks:
-      - fidel
+      - net
 
   redis:
     image: redis:latest
     container_name: fidel-redis
-    ports:
-      - "6379:6379"
+    # ports:
+    #   - "6379:6379"
     healthcheck:
       test: ["CMD", "redis-cli", "ping"]
       interval: 5s
@@ -74,10 +75,10 @@ services:
       retries: 20
     restart: unless-stopped
     networks:
-      - fidel
+      - net
 
 volumes:
   pgdata:
 
 networks:
-  fidel:
+  net:
