@@ -221,9 +221,11 @@ class ChatService:
         messages: list[dict[str, str]],
     ) -> AsyncIterator[dict[str, str]]:
         assistant_parts: list[str] = []
+        saw_done = False
         async for chunk in self.inference.stream_chat(messages):
             parsed = self._parse_stream_chunk(chunk, conversation.id)
             if parsed is _DONE_SENTINEL:
+                saw_done = True
                 break
             if parsed is None:
                 continue
@@ -246,6 +248,8 @@ class ChatService:
             conversation_id=str(conversation.id),
             user_id=str(self.user.id),
         )
+        if saw_done:
+            yield {"event": "message", "data": "[DONE]"}
 
     def _parse_stream_chunk(self, chunk: str, conversation_id: UUID):
         data = chunk.removeprefix("data: ")
